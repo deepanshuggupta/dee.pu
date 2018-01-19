@@ -1,53 +1,167 @@
+var http = require('http');
+var express = require('express');
+var fs = require('fs');
+var app = express();
+var shortid = require('shortid');
+var mongodb = require('mongodb');
 
-package xyz;
+var MongoClient = mongodb.MongoClient;
 
-public class Xyz {
-    static int arr[] = new int[10001];
-    public static void main(String[] args) {
-        //int arr[] = new int[10001];
-        int i =2;
-        while(i<arr.length){
-            int num = i;
-            for(int j=1;j<=5;j++){
-                int result = check(num);
-                if(result ==2) arr[num] =2;
-                else arr[num] = 1;
-                num = change(num);
-            }
-            i++;
-        }
+
+
+//console.log(shortid.generate());
+var bodyParser = require('body-parser');
+
+
+app.use(bodyParser.urlencoded({ extended: true }));
+
+app.use(bodyParser.json());
+
+app.set('view engine','ejs');
+
+console.log('Working now!');
+var url = 'mongodb://localhost:27017/database';
+
+var link_db;
+/*
+add_link : function used to add
+  the shorten link and the main url to 
+  the database.
+params:
+  link - the original URL
+  id - short id for the URL
+  
+*/
+function add_link(link,id){
+
+  var link_db = link;
+  var id_db = id;
+  MongoClient.connect(url,function(err,db){
+    if(err){
+      console.log(err);
     }
-    static int check(int num){
-        if(arr[num]==1) return 1;
-        else if(arr[num]==2) return 2;
-        else {
-            int temp = 2;
-            while(temp<=Math.sqrt(num)){
-                if(num%temp==0) return 0;
-                temp++;
-            }
-            return 2;
+    else{
+      //console.log('Connected to ',url);
+
+      var collection = db.collection('uids');
+
+      var obj = {link:link_db,id:id_db};
+
+      collection.insert(obj,function(err,res){
+
+        if(err){
+          console.log(err);
         }
-    }
-    static int change(int num){
-        int updated = num;
-        int digits = 0;
-        while(updated!=0){
-            updated/=10;
-            digits++;
+        else{
+          console.log('%d Links Entered!', res.insertedCount);
         }
-        int brr[] = new int[digits];
-        updated = num;
-        for(int x =brr.length-1;x>=0;x--){
-            brr[x] = updated%10;
-            updated /=10;
-        }
-        updated =0;
-        for(int x =1;x<brr.length;x++){
-            updated = updated*10+ brr[x];
-        }
-        updated = updated*10+ brr[0]; 
-        return updated;
-    }
-    
+        db.close();
+      });
+
+      }
+  });
+
 }
+
+/*
+get_link : function to get the link 
+  from the database.
+  
+params:
+  uid - unique id for every link 
+  that was generated before.
+  request - request object
+  resp - response object
+  
+*/
+function get_link(uid,request,resp){
+
+  var id_db = uid;
+  MongoClient.connect(url,function(err,db){
+    if(err){
+      console.log(err);
+    }
+    else{
+      //console.log('Connected to, ',url);
+
+      var collection = db.collection('uids');
+
+      collection.find({id:id_db}).toArray(function(err,res){
+        if(err){
+          console.log(err);
+        }
+        else if(res.length == 1){
+          link_db = res[0]['link'];
+          //console.log(JSON.stringify(link_db));
+          //link_db = JSON.stringify(link_db);
+          //link_db.replace(/"/g, '\'');
+          console.log(String(link_db));
+          resp.writeHead(302, {
+            'Location': link_db
+            //add other headers here...
+          });
+          resp.end();
+          console.log("New URL: ",request.url);
+          //console.log("BODY: ",request.body);
+        }
+        else{
+          console.log('No such UID exists!');
+          resp.writeHead(301,
+          {Location: '/short/error404'}
+          );
+          link_db = 'NULL';
+          resp.end();
+        }
+        db.close();
+      });
+
+    }
+
+  });
+}
+app.get('/',function(req,res){
+  console.log('Shortner Redirector');
+  res.writeHead(301,
+  {Location: 'http://localhost:5000/short'}
+  );
+  res.end();
+});
+
+app.get('/short',function(req,res){
+  res.writeHead(200,{'Content-Type':'text/html'});
+  //res.end('You are using sho.rt');
+  var myInputStream = fs.createReadStream(__dirname + "/shortner.html");
+  myInputStream.pipe(res);
+});
+
+
+app.post('/short/url',function(req,res){
+  //res.writeHead(200,{'Content-Type':'text/plain'});
+  //res.end('URL is : ' + req.body.mainurl_); URL as entered by the user
+  var uid = shortid.generate();
+  console.log(uid);
+  uid = "localhost:5000/" + uid;
+  add_link(req.body.mainurl,uid);
+  res.render('uid',{uniqueid: uid});
+  res.end("localhost:5000/" + uid); // generates unique ID and shortens the url.
+  //console.log(req.body.mainurl);
+});
+
+
+app.get('/:uid',function(req,res){
+  //req.url="google.co.in";
+  get_link("localhost:5000/" + req.params.uid,req,res);
+
+  console.log('Redirector');
+});
+
+
+app.get('/short/error404',function(req,res){
+  console.log('Error Page!');
+  res.writeHead(200,{'Content-Type':'text/html'});
+  var myInputStream = fs.createReadStream(__dirname + "/error.html");
+  myInputStream.pipe(res);
+});
+
+
+app.listen(5000);
