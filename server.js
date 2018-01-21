@@ -12,11 +12,25 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-fs.readFile('data.json', function(err, data){
-	var jsonContent = JSON.parse(data);
-	console.log(jsonContent.deepu);
+// get links
+/*fs.readFile('data.json', function(err, data){
+	
+	if (err){
+        console.log(err);
+    } else {
+		obj = JSON.parse(data); //now it an object
+		obj.table.push({id: 2, square:3}); //add some data
+		json = JSON.stringify(obj); //convert it back to json
+		console.log(json);
+		
+	}
+	
 });
 	
+fs.writeFile('data.json', function(err, data){
+	var obj = JSON.parse(data);
+	console.log(obj);
+});*/
 
 app.post('/generate', function(req, res){
 	
